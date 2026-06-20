@@ -11,9 +11,6 @@
 
 <!-- ══════════════════════════════════════════════
      FIREBASE SDK  (v9 compat CDN – easy drop-in)
-     Replace the firebaseConfig below with YOUR
-     project's config from Firebase Console →
-     Project Settings → Your Apps → Web App.
      ══════════════════════════════════════════════ -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
@@ -487,23 +484,16 @@ footer.legal{text-align:center;font-size:11px;color:var(--slate);padding:12px 20
 
 <script>
 /* ════════════════════════════════════════════════════════════
-   ★  FIREBASE CONFIGURATION
-   ────────────────────────────────────────────────────────────
-   Replace EVERY value below with your own Firebase project.
-   Steps:
-   1. Go to https://console.firebase.google.com
-   2. Create a project → Add a Web App
-   3. Copy the firebaseConfig object and paste it here
-   4. Enable Firestore in "Build → Firestore Database"
-   5. Enable Anonymous Auth in "Build → Authentication"
+   ★  FIREBASE CONFIGURATION  (live project: singapen-app)
    ════════════════════════════════════════════════════════════ */
 const firebaseConfig = {
-  apiKey:            "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
-  authDomain:        "your-project.firebaseapp.com",
-  projectId:         "your-project",
-  storageBucket:     "your-project.appspot.com",
-  messagingSenderId: "000000000000",
-  appId:             "1:000000000000:web:xxxxxxxxxxxxxxxx"
+  apiKey:            "AIzaSyB6H0ZDOP1Ci5JUdQ5wIUijjBMijLMHW14",
+  authDomain:        "singapen-app.firebaseapp.com",
+  projectId:         "singapen-app",
+  storageBucket:     "singapen-app.firebasestorage.app",
+  messagingSenderId: "116874719126",
+  appId:             "1:116874719126:web:2c8266cfd9b198418ab7b7",
+  measurementId:     "G-5TQS303B5F"
 };
 
 /* ── Init Firebase (graceful fallback to localStorage if not configured) ── */
@@ -515,9 +505,11 @@ try {
   db = firebase.firestore();
   // Enable offline persistence
   db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
-  firebase.auth().signInAnonymously().then(() => { firebaseReady = true; }).catch(() => {});
+  firebase.auth().signInAnonymously().then(() => { firebaseReady = true; render(); }).catch((e) => {
+    console.warn('Anonymous sign-in failed', e);
+  });
 } catch(e) {
-  console.warn('Firebase not configured – using localStorage fallback');
+  console.warn('Firebase not configured – using localStorage fallback', e);
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -636,6 +628,9 @@ const DB = {
     }
   }
 };
+
+/* saveHelper alias (defined immediately so register-helper can call it) */
+DB.saveHelper = DB.saveUser;
 
 /* ════════════════════════════════════════════════════════════
    APP STATE
@@ -821,9 +816,9 @@ function cloudStatus(){
   d.innerHTML=`
     <div class="cs-left">
       <div class="cs-dot ${firebaseReady?'':'offline'}"></div>
-      <span class="cs-text">${firebaseReady?'Cloud sync active':'Local storage mode'}</span>
+      <span class="cs-text">${firebaseReady?'Cloud sync active':'Connecting…'}</span>
     </div>
-    <span class="cloud-badge">${firebaseReady?'☁ Firestore':'💾 Local'}</span>
+    <span class="cloud-badge">${firebaseReady?'☁ Firestore':'⏳ Sync'}</span>
   `;
   return d;
 }
@@ -941,7 +936,7 @@ function renderRegisterUser(el){
       await DB.saveUser(rec);
       sessionStorage.setItem('singapen_user',JSON.stringify(rec));
       App.currentUser=rec;App.view='user-home';App.error='';render();
-    }catch(err){App.error='Could not save. Please try again.';render();}
+    }catch(err){console.error(err);App.error='Could not save. Please try again.';render();}
     btn.classList.remove('loading');btn.disabled=false;
   };
 }
@@ -1013,13 +1008,10 @@ function renderRegisterHelper(el){
       await DB.saveHelper(rec);
       sessionStorage.setItem('singapen_user',JSON.stringify(rec));
       App.currentUser=rec;App.view='helper-home';App.error='';render();
-    }catch(err){App.error='Could not save. Please try again.';render();}
+    }catch(err){console.error(err);App.error='Could not save. Please try again.';render();}
     btn.classList.remove('loading');btn.disabled=false;
   };
 }
-
-/* saveHelper alias */
-DB.saveHelper = DB.saveUser;
 
 /* ════════════════════════════════════════════════════════════
    LOGIN
@@ -1064,7 +1056,7 @@ function renderLogin(el){
       App.currentUser=found;
       App.view=found.type==='user'?'user-home':'helper-home';
       App.error='';render();
-    }catch(err){App.error='Login failed. Please try again.';render();btn.classList.remove('loading');btn.disabled=false;}
+    }catch(err){console.error(err);App.error='Login failed. Please try again.';render();btn.classList.remove('loading');btn.disabled=false;}
   };
 }
 
@@ -1155,14 +1147,14 @@ async function sendHelp(){
       nearbyCount=helpers.length;
     }
     await DB.saveAlert(alertRec);
-  }catch(e){ nearbyCount=0; }
+  }catch(e){ console.error(e); nearbyCount=0; }
   await new Promise(r=>setTimeout(r,900));
   App.sendingHelp=false;App.helpSentAt=Date.now();App.lastHelperCount=nearbyCount;render();
   showSnack(nearbyCount>0?`${nearbyCount} helper(s) notified`:'Alert saved — waiting for a helper');
 }
 
 /* ════════════════════════════════════════════════════════════
-   HELPER HOME
+   HELPER DASHBOARD
    ════════════════════════════════════════════════════════════ */
 async function renderHelperHome(el){
   const h=App.currentUser;
@@ -1215,7 +1207,7 @@ async function renderHelperHome(el){
 async function loadAlerts(listEl,helper){
   listEl.innerHTML=`<div class="empty-state"><div class="ring" style="width:36px;height:36px;border-width:3px;"></div></div>`;
   let alerts=[];
-  try{ alerts=await DB.getAlerts(); }catch(e){}
+  try{ alerts=await DB.getAlerts(); }catch(e){ console.error(e); }
 
   if(helper.loc){
     alerts=alerts.filter(a=>{if(!a.loc)return true;return haversineKm(helper.loc.lat,helper.loc.lng,a.loc.lat,a.loc.lng)<=(helper.radius||5);});
@@ -1257,7 +1249,7 @@ async function loadAlerts(listEl,helper){
         try{
           await DB.updateAlert(a.id,{resolved:true,resolvedAt:Date.now(),resolvedBy:helper.id});
           showSnack('Marked as resolved ✓');render();
-        }catch(err){btn.disabled=false;btn.textContent='✓ Mark resolved';}
+        }catch(err){console.error(err);btn.disabled=false;btn.textContent='✓ Mark resolved';}
       };
     }
   });
